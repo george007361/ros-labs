@@ -3,6 +3,12 @@
 
 #include <sstream>
 
+void chatterCallback(const std_msgs::String::ConstPtr& msg)
+{
+  // Getting
+  ROS_ERROR("Reply is: [%s]", msg->data.c_str());
+}
+
 /**
  * This tutorial demonstrates simple sending of messages over the ROS system.
  */
@@ -45,6 +51,7 @@ int main(int argc, char **argv)
    * buffer up before throwing some away.
    */
   ros::Publisher chatter_pub = n.advertise<std_msgs::String>("chatter", 1000);
+  ros::Subscriber reply_sub = n.subscribe("reply", 1000, replyCallback);
 
   ros::Rate loop_rate(10);
 
