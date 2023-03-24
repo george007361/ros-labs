@@ -1,5 +1,6 @@
 #include "ros/ros.h"
 #include "std_msgs/String.h"
+#include "stdio.h"
 
 #include "my_common.cpp"
 
