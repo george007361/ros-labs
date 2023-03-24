@@ -119,9 +119,7 @@ include_directories(
 )
 
 ## Declare a C++ library
-# add_library(chat
-#   src/${PROJECT_NAME}/chat.cpp
-# )
+add_library(my_common src/my_common.cpp)
 
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries
@@ -138,11 +136,11 @@ add_executable(listener_node src/listener.cpp)
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(talker_node
-  ${catkin_LIBRARIES}
+  ${catkin_LIBRARIES} my_common
 )
 
 target_link_libraries(listener_node
-  ${catkin_LIBRARIES}
+  ${catkin_LIBRARIES} my_common
  )
 
 #############
