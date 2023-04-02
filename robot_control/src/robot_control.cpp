@@ -2,6 +2,34 @@
 #include "sensor_msgs/LaserScan.h"
 #include "nav_msgs/Odometry.h"
 
+class Command : public geometry_msgs::Twist
+{
+public:
+  enum Rotate
+  {
+    RIGHT = -1,
+    LEFT = 1,
+    STOP = 0
+  };
+
+public:
+  Command() = default;
+  void rotate(const int dir, const int ang_speed = 1)
+  {
+    this->angular.z = ang_speed * dir;
+  }
+
+  void go(const int lin_speed = 1)
+  {
+    this->linear.x = lin_speed;
+  }
+
+  void stop()
+  {
+    this->linear.x = 0;
+  }
+};
+
 class Obstacles
 {
 
@@ -9,20 +37,11 @@ public:
   enum Positions
   {
     LEFT,
-    RIGHT,
-    FRONT
+    FRONT,
+    RIGHT
   };
 
   typedef std::vector<bool> ObstaclesVector;
-  // friend ObstaclesVector operator-(const ObstaclesVector &a, ObstaclesVector &b)
-  // {
-  //   if (a.size() != b.size())
-  //     throw("a.size() != b.size()");
-  //   ObstaclesVector c(a.size());
-  //   for (size_t i = 0; i < a.size(); ++i)
-  //     c[i] = a[i] - b[i];
-  //   return c;
-  // }
 
 private:
   ObstaclesVector obstacles;
@@ -77,8 +96,8 @@ public:
     size_t step = msg.ranges.size() / 5;
 
     size_t from, to;
-    // Right
 
+    // Right
     from = 0 * step;
     to = 1 * step;
     obstacles[Positions::RIGHT] = check_sector(msg, from, to);
@@ -93,7 +112,7 @@ public:
 
     from = 4 * step;
     to = 5 * step;
-    obstacles[Positions::RIGHT] = check_sector(msg, from, to);
+    obstacles[Positions::LEFT] = check_sector(msg, from, to);
   }
 
 private:
@@ -123,14 +142,6 @@ private:
   ros::Timer timer;
 
 public:
-  enum Rotate
-  {
-    RIGHT = 1,
-    LEFT = -1,
-    STOP = 0
-  };
-
-public:
   RobotControl(const int ang_speed = 1, const int lin_speed = 1, const int min_dist = 1) : ang_speed(ang_speed), lin_speed(lin_speed), obstacles(min_dist)
   {
     this->laser_sub = this->n.subscribe("base_scan", 1, &Obstacles::calc_obstales, &this->obstacles);
@@ -146,38 +157,25 @@ public:
 private:
   void logic(const ros::TimerEvent &ev)
   {
+    Command cmd;
     if (obstacles.check_obstacle(Obstacles::Positions::FRONT))
     {
-      stop();
-      rotate(Rotate::LEFT);
+      cmd.stop();
+      cmd.rotate(Command::Rotate::LEFT, ang_speed);
     }
     else
     {
-      go();
+      cmd.go(lin_speed);
     }
-  }
-  void rotate(int dir)
-  {
-    geometry_msgs::Twist cmd;
-    cmd.angular.z = this->ang_speed * dir;
-    this->pub.publish(cmd);
-  }
 
-  void go()
-  {
-    geometry_msgs::Twist cmd;
-    cmd.linear.x = this->lin_speed;
-    this->pub.publish(cmd);
-  }
-
-  void stop()
-  {
-    geometry_msgs::Twist cmd;
-    cmd.linear.x = 0;
-    this->pub.publish(cmd);
+    send_command(cmd);
   }
 
 private:
+  void send_command(const Command &cmd)
+  {
+    pub.publish((geometry_msgs::Twist)cmd);
+  }
 };
 
 int main(int argc, char **argv)
