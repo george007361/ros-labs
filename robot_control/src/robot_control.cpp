@@ -2,134 +2,190 @@
 #include "sensor_msgs/LaserScan.h"
 #include "nav_msgs/Odometry.h"
 
-enum ObstaclePosition
+class Obstacles
 {
-  ON_LEFT,
-  ON_RIGHT,
-  ON_FRONT,
-  NONE
+
+public:
+  enum Positions
+  {
+    LEFT,
+    RIGHT,
+    FRONT
+  };
+
+  typedef std::vector<bool> ObstaclesVector;
+  // friend ObstaclesVector operator-(const ObstaclesVector &a, ObstaclesVector &b)
+  // {
+  //   if (a.size() != b.size())
+  //     throw("a.size() != b.size()");
+  //   ObstaclesVector c(a.size());
+  //   for (size_t i = 0; i < a.size(); ++i)
+  //     c[i] = a[i] - b[i];
+  //   return c;
+  // }
+
+private:
+  ObstaclesVector obstacles;
+  double min_dist;
+
+public:
+  Obstacles(double min_dist = 0.5) : min_dist(min_dist)
+  {
+    for (size_t i = 0; i < 3; i++)
+    {
+      obstacles.push_back(false);
+    }
+  }
+
+  ObstaclesVector get_obstacles()
+  {
+    return obstacles;
+  }
+
+  bool is_obstacle()
+  {
+    for (size_t i = 0; i < 3; i++)
+    {
+      if (obstacles[i])
+        return true;
+    }
+    return false;
+  }
+
+  bool check_obstacle(int pos)
+  {
+    if (pos < 0 || pos > 2)
+    {
+      return false;
+    }
+
+    return obstacles[pos];
+  }
+
+  static bool check_obstacle(const ObstaclesVector &st, int pos)
+  {
+    if (pos < 0 || pos > 2)
+    {
+      return false;
+    }
+
+    return st[pos];
+  }
+
+  void calc_obstales(const sensor_msgs::LaserScan &msg)
+  {
+    size_t step = msg.ranges.size() / 5;
+
+    size_t from, to;
+    // Right
+
+    from = 0 * step;
+    to = 1 * step;
+    obstacles[Positions::RIGHT] = check_sector(msg, from, to);
+
+    // Forw
+
+    from = 2 * step;
+    to = 3 * step;
+    obstacles[Positions::FRONT] = check_sector(msg, from, to);
+
+    // Left
+
+    from = 4 * step;
+    to = 5 * step;
+    obstacles[Positions::RIGHT] = check_sector(msg, from, to);
+  }
+
+private:
+  bool check_sector(const sensor_msgs::LaserScan &msg, const int from, const int to)
+  {
+    for (int i = from; i < to; ++i)
+    {
+      if (msg.ranges[i] < min_dist)
+      {
+        return true;
+      }
+    }
+    return false;
+  }
 };
 
-ros::Publisher pub;
-
-int obstacle_position;
-
-void scanCallback(const sensor_msgs::LaserScan &msg)
+class RobotControl
 {
-  size_t middle_idx = msg.ranges.size() / 2;
-  double min_distance = 0.5;
-  bool obstacle_left = false;
-  bool obstacle_right = false;
 
-  for (int i = 0; i < middle_idx; ++i)
+private:
+  int ang_speed;
+  int lin_speed;
+  Obstacles obstacles;
+  ros::NodeHandle n;
+  ros::Publisher pub;
+  ros::Subscriber laser_sub;
+  ros::Timer timer;
+
+public:
+  enum Rotate
   {
-    if (msg.ranges[i] < min_distance)
+    RIGHT = 1,
+    LEFT = -1,
+    STOP = 0
+  };
+
+public:
+  RobotControl(const int ang_speed = 1, const int lin_speed = 1, const int min_dist = 1) : ang_speed(ang_speed), lin_speed(lin_speed), obstacles(min_dist)
+  {
+    this->laser_sub = this->n.subscribe("base_scan", 1, &Obstacles::calc_obstales, &this->obstacles);
+    this->pub = this->n.advertise<geometry_msgs::Twist>("cmd_vel", 1);
+    this->timer = this->n.createTimer(ros::Rate(1000), &RobotControl::logic, this);
+  }
+
+  void start()
+  {
+    ros::spin();
+  }
+
+private:
+  void logic(const ros::TimerEvent &ev)
+  {
+    if (obstacles.check_obstacle(Obstacles::Positions::FRONT))
     {
-      obstacle_left = true;
-      break;
+      stop();
+      rotate(Rotate::LEFT);
+    }
+    else
+    {
+      go();
     }
   }
-
-  for (int i = middle_idx; i < msg.ranges.size(); ++i)
+  void rotate(int dir)
   {
-    if (msg.ranges[i] < min_distance)
-    {
-      obstacle_right = true;
-      break;
-    }
+    geometry_msgs::Twist cmd;
+    cmd.angular.z = this->ang_speed * dir;
+    this->pub.publish(cmd);
   }
 
-  if (!obstacle_left && !obstacle_right)
+  void go()
   {
-    ROS_INFO("Obstacle not detected");
-    obstacle_position = ObstaclePosition::NONE;
-    return;
+    geometry_msgs::Twist cmd;
+    cmd.linear.x = this->lin_speed;
+    this->pub.publish(cmd);
   }
 
-  if (obstacle_left && obstacle_right)
+  void stop()
   {
-    ROS_INFO("Obstacle detected in front");
-    obstacle_position = ObstaclePosition::ON_FRONT;
-    return;
-  }
-
-  if (obstacle_left)
-  {
-    ROS_INFO("Obstacle detected on the left");
-    obstacle_position = ObstaclePosition::ON_LEFT;
-    return;
-  }
-
-  if (obstacle_right)
-  {
-    ROS_INFO("Obstacle detected on the right");
-    obstacle_position = ObstaclePosition::ON_RIGHT;
-    return;
-  }
-}
-
-void poseCallback(const nav_msgs::Odometry &msg)
-{
-  ROS_DEBUG_STREAM("Pose msg: x = " << msg.pose.pose.position.x << " y = " << msg.pose.pose.position.y << " theta = " << 2 * atan2(msg.pose.pose.orientation.z, msg.pose.pose.orientation.w));
-}
-
-void timerCallback(const ros::TimerEvent &ev)
-{
-  geometry_msgs::Twist cmd;
-
-  switch (obstacle_position)
-  {
-  default:
-  {
-    ROS_ERROR_STREAM("Idk where is robot");
-    cmd.linear = geometry_msgs::Vector3();
-    cmd.angular = geometry_msgs::Vector3();
-    break;
-  }
-  case ObstaclePosition::NONE:
-  {
-    cmd.linear.x = 1;
-    cmd.angular.z = 0;
-    break;
-  }
-
-  case ObstaclePosition::ON_LEFT:
-  {
+    geometry_msgs::Twist cmd;
     cmd.linear.x = 0;
-    cmd.angular.z = 0.1;
-    break;
-  }
-  case ObstaclePosition::ON_RIGHT:
-  {
-    cmd.linear.x = 0;
-    cmd.angular.z = -0.1;
-    break;
+    this->pub.publish(cmd);
   }
 
-  case ObstaclePosition::ON_FRONT:
-  {
-    cmd.linear.x = 0;
-    cmd.angular.z = 0.1;
-    break;
-  }
-  }
-
-  pub.publish(cmd);
-}
+private:
+};
 
 int main(int argc, char **argv)
 {
   ros::init(argc, argv, "control_node");
-  ros::NodeHandle n;
-  obstacle_position = ObstaclePosition::NONE;
-  ros::Subscriber laser_sub = n.subscribe("base_scan", 1, scanCallback);
-  ros::Subscriber pose_sub = n.subscribe("base_pose_ground_truth", 1, poseCallback);
 
-  ros::Timer timer1 = n.createTimer(ros::Duration(0.001), timerCallback);
-
-  pub = n.advertise<geometry_msgs::Twist>("cmd_vel", 1);
-
-  ros::spin();
+  RobotControl rob;
+  rob.start();
 
   return 0;
 }
