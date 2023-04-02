@@ -99,7 +99,7 @@ public:
 
     // Right
     from = 0 * step;
-    to = 1 * step;
+    to = 2 * step;
     obstacles[Positions::RIGHT] = check_sector(msg, from, to);
 
     // Forw
@@ -110,7 +110,7 @@ public:
 
     // Left
 
-    from = 4 * step;
+    from = 3 * step;
     to = 5 * step;
     obstacles[Positions::LEFT] = check_sector(msg, from, to);
   }
@@ -161,12 +161,25 @@ private:
     if (obstacles.check_obstacle(Obstacles::Positions::FRONT))
     {
       cmd.stop();
-      cmd.rotate(Command::Rotate::LEFT, ang_speed);
+      if (obstacles.check_obstacle(Obstacles::Positions::RIGHT))
+      {
+        cmd.rotate(Command::Rotate::LEFT, 0.5);
+      }
+      else
+      {
+        cmd.rotate(Command::Rotate::RIGHT, 0.5);
+      }
     }
     else
     {
-      cmd.go(lin_speed);
+      cmd.go();
+      if (!obstacles.check_obstacle(Obstacles::Positions::RIGHT))
+      {
+        cmd.rotate(Command::Rotate::RIGHT, 0.5);
+      }
     }
+
+    ROS_INFO_STREAM(cmd);
 
     send_command(cmd);
   }
