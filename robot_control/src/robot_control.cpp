@@ -3,6 +3,8 @@
 #include "nav_msgs/Odometry.h"
 
 bool obstacle = false;
+double rangeEps = 0;
+double angleEps = 0;
 ros::Publisher pub;
 
 /**
@@ -14,17 +16,21 @@ void laserCallback(const sensor_msgs::LaserScan& msg)
 {
   ROS_DEBUG_STREAM("Laser msg: "<<msg.scan_time);
 
-  const double kMinRange = 0.3;
+  //const double kMinRange = 0.3;
+  const double wallRange = 1;
   //проверим нет ли вблизи робота препятствия
-  for (size_t i = 0; i<msg.ranges.size(); i++)
-  {
-      if (msg.ranges[i] < kMinRange)
-	  {
-		  obstacle = true;
-		  ROS_WARN_STREAM("OBSTACLE!!!");
-		  break;
-	  }
-  }
+  //for (size_t i = 0; i<msg.ranges.size(); i++)
+  //{
+      //if (msg.ranges[i] < kMinRange)
+	  //{
+		  //obstacle = true;
+		  //ROS_WARN_STREAM("OBSTACLE!!!");
+		  //break;
+	  //}
+  //}
+  rangeEps = msg.ranges[0] - wallRange;
+  angleEps = cos(msg.angle_increment)*msg.ranges[1] - msg.ranges[0];
+  ROS_INFO_STREAM("RangeEps: "<<rangeEps<<"; AngleEps: "<<angleEps);
 }
 
 
@@ -55,22 +61,26 @@ void timerCallback(const ros::TimerEvent&)
 	geometry_msgs::Twist cmd;
 	//при создании структура сообщения заполнена нулевыми значениями
 	//если вблизи нет препятствия то задаем команды
-    if (!obstacle)
-	{
-        if (counter % 30 > 15)
-		{
-			ROS_INFO_STREAM("go left");
-			cmd.linear.x = 0.5;
-			cmd.angular.z = 0.5;
-		}
-		else
-		{
-			ROS_INFO_STREAM("go right");
-			cmd.linear.x = 0.5;
-			cmd.angular.z = -0.5;
-		}
-	}
+    //if (!obstacle)
+	//{
+        //if (counter % 30 > 15)
+		//{
+			//ROS_INFO_STREAM("go left");
+			//cmd.linear.x = 0.1;
+			//cmd.angular.z = 0.5;
+		//}
+		//else
+		//{
+			//ROS_INFO_STREAM("go right");
+			//cmd.linear.x = 0.1;
+			//cmd.angular.z = -0.5;
+		//}
+	//}
 	//отправляем (публикуем) команду
+	const double K_A = -20;
+	const double K_R = -1;
+	cmd.angular.z = K_A * angleEps + K_R*rangeEps;
+	cmd.linear.x = 0.1;
 	pub.publish(cmd);
 }
 
