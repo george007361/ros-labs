@@ -14,12 +14,12 @@ public:
 
 public:
   Command() = default;
-  void rotate(const int dir, const int ang_speed = 1)
+  void rotate(const int dir, const double ang_speed = 1)
   {
     this->angular.z = ang_speed * dir;
   }
 
-  void go(const int lin_speed = 1)
+  void go(const double lin_speed = 1)
   {
     this->linear.x = lin_speed;
   }
