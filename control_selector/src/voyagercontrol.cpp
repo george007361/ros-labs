@@ -9,7 +9,7 @@ void VoyagerControl::setLaserData(const std::vector<float> &data)
         if ( data[i] < min_range )
         {
             obstacle = true;
-            ROS_WARN_STREAM("OBSTACLE!!!");
+            ROS_INFO_STREAM("OBSTACLE!!!");
             break;
         }
     }

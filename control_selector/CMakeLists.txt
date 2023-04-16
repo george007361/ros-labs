@@ -29,6 +29,10 @@ add_executable(control_selector
              src/dummy_control.cpp
              src/voyagercontrol.h
              src/voyagercontrol.cpp
+             src/wall_follower.h
+             src/wall_follower.cpp
+             src/wall_follower_new.h
+             src/wall_follower_new.cpp
                                 )
 
 ## Specify libraries to link a library or executable target against
@@ -36,3 +40,12 @@ target_link_libraries(control_selector
    ${catkin_LIBRARIES}
  )
 
+
+ ## Declare a C++ executable
+add_executable(console_selector
+src/console_selector_node.cpp)
+
+## Specify libraries to link a library or executable target against
+target_link_libraries(console_selector
+${catkin_LIBRARIES}
+)
