@@ -90,42 +90,6 @@ void laserCallback(const sensor_msgs::LaserScan &scan)
     map_msg.info.origin.position.y = scan_pose.y() - map_height * map_resolution / 2.0;
 
     // индексы карты, соответствующие положению центра лазера
-    int y = (scan_pose.y() - map_msg.info.origin.position.y) / map_resolution;
-    int x = (scan_pose.x() - map_msg.info.origin.position.x) / map_resolution;
-    ROS_DEBUG_STREAM("publish map " << x << " " << y);
-    // в клетку карты соотвтествующую центру лазера - записываем значение 0
-    map_msg.data[y * map_width + x] = 0;
-
-    // публикуем сообщение с построенной картой
-    mapPub.publish(map_msg);
-}
-
-void laserCallback3(const sensor_msgs::LaserScan &scan)
-{
-    tf::StampedTransform scanTransform;
-    const std::string &laser_frame = scan.header.frame_id;
-    const ros::Time &laser_stamp = scan.header.stamp;
-    if (!determineScanTransform(scanTransform, laser_stamp, laser_frame))
-    {
-        return;
-    }
-
-    // создаем сообщение карты
-    nav_msgs::OccupancyGrid map_msg;
-    // заполняем информацию о карте - готовим сообщение
-    prepareMapMessage(map_msg, laser_stamp);
-
-    // положение центра дальномера в СК дальномера
-    tf::Vector3 zero_pose(0, 0, 0);
-    // положение дальномера в СК карты
-    tf::Vector3 scan_pose = scanTransform(zero_pose);
-    ROS_DEBUG_STREAM("scan pose " << scan_pose.x() << " " << scan_pose.y());
-
-    // задаем начало карты так, чтобы сканнер находился в центре карты
-    map_msg.info.origin.position.x = scan_pose.x() - map_width * map_resolution / 2.0;
-    map_msg.info.origin.position.y = scan_pose.y() - map_height * map_resolution / 2.0;
-
-    // индексы карты, соответствующие положению центра лазера
     int center_y = (scan_pose.y() - map_msg.info.origin.position.y) / map_resolution;
     int center_x = (scan_pose.x() - map_msg.info.origin.position.x) / map_resolution;
     ROS_DEBUG_STREAM("publish map " << center_x << " " << center_y);
@@ -196,7 +160,7 @@ int main(int argc, char **argv)
     tfListener = new tf::TransformListener;
 
     // Подписываемся на данные дальномера
-    ros::Subscriber laser_sub = node.subscribe("/scan", 100, laserCallback3);
+    ros::Subscriber laser_sub = node.subscribe("/scan", 100, laserCallback);
 
     // объявляем публикацию сообщений карты
     // Используем глобальную переменную, так как она понядобится нам внутр функции - обработчика данных лазера
