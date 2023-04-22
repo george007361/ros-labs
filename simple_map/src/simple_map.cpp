@@ -155,9 +155,11 @@ void laserCallback3(const sensor_msgs::LaserScan &scan)
         
         // проверяем, что ячейка не находится за пределами карты
         if(map_idx > 0 && map_idx < map_idx_max){
-            map_msg.data[map_idx] = 0;
+            map_msg.data[map_idx] = 100;
         }
         
+
+
         // if (obstacle_x < 0 || obstacle_y < 0 || obstacle_x >= map_width / map_resolution || obstacle_y >= map_height / map_resolution){
             // map_msg.data[obstacle_y * map_width + obstacle_x] = 
         // }
