@@ -97,42 +97,69 @@ void laserCallback(const sensor_msgs::LaserScan &scan)
     // в клетку карты соотвтествующую центру лазера - записываем значение 0
     map_msg.data[center_y * map_width + center_x] = 0;
 
-    // проходим по каждому измерению лидара
-    for (int i = 0; i < scan.ranges.size(); i++) {
+    int map_idx_max = map_width * map_height;
 
-        if (scan.ranges[i] < scan.range_min || scan.ranges[i] > scan.range_max) {
+    // проходим по каждому измерению лидара
+    for (int i = 0; i < scan.ranges.size(); i++)
+    {
+
+        if (scan.ranges[i] < scan.range_min || scan.ranges[i] > scan.range_max)
+        {
             continue;
         }
 
+
+        // Угол в ПСК ЛД
         float angle = scan.angle_min + i * scan.angle_increment;
 
-        // вычисляем позицию препятствия в системе координат карты
+        // вычисляем позицию препятствия в системе координат ЛД
         tf::Vector3 obstacle_pose(scan.ranges[i] * cos(angle), scan.ranges[i] * sin(angle), 0.0);
+
+        
+        // Шаг для прохода по лучу
+        double step   = 0.1;
+
+        // Идем по лучу от ЛД до препятствия
+        for (double r = scan.range_min; r < scan.ranges[i] - step; r += step)
+        {
+            // Точка в ДСК ЛД
+            tf::Vector3 free_pos(r * cos(angle), r * sin(angle), 0.0);
+            // Точка в ДСК Карты
+            tf::Vector3 free_pos_map = scanTransform * free_pos;
+            
+            // коорд точки карты
+            int free_x = (free_pos_map.x() - map_msg.info.origin.position.x) / map_resolution;
+            int free_y = (free_pos_map.y() - map_msg.info.origin.position.y) / map_resolution;
+
+            // индекс в массиве карты
+            int map_free_idx = free_y * map_width + free_x;
+
+            // проверяем, что ячейка не находится за пределами карты
+            if (map_free_idx > 0 && map_free_idx < map_idx_max)
+            {
+                map_msg.data[map_free_idx] = 0;
+            }
+        }
+
+        // вычисляем позицию препятствия в системе координат карты
         tf::Vector3 obstacle_pose_map = scanTransform * obstacle_pose;
 
         // индексы ячейки, соответствующей позиции препятствия
         int obstacle_x = (obstacle_pose_map.x() - map_msg.info.origin.position.x) / map_resolution;
         int obstacle_y = (obstacle_pose_map.y() - map_msg.info.origin.position.y) / map_resolution;
 
-        int map_idx_max = map_width * map_height;
         int map_idx = obstacle_y * map_width + obstacle_x;
-        
+
         // проверяем, что ячейка не находится за пределами карты
-        if(map_idx > 0 && map_idx < map_idx_max){
+        if (map_idx > 0 && map_idx < map_idx_max)
+        {
             map_msg.data[map_idx] = 100;
         }
-        
-
-
-        // if (obstacle_x < 0 || obstacle_y < 0 || obstacle_x >= map_width / map_resolution || obstacle_y >= map_height / map_resolution){
-            // map_msg.data[obstacle_y * map_width + obstacle_x] = 
-        // }
     }
 
     // публикуем сообщение с построенной картой
     mapPub.publish(map_msg);
 }
-
 
 int main(int argc, char **argv)
 {
